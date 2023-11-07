@@ -40,7 +40,9 @@ defmodule ChallengeBackend.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
-      {:plug_cowboy, "~> 2.5"}
+      {:plug_cowboy, "~> 2.5"},
+      {:argon2_elixir, "~> 4.0"},
+      {:brcpfcnpj, "~> 1.0"}
     ]
   end
 
