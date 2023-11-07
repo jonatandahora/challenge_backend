@@ -11,7 +11,7 @@ defmodule ChallengeBackend.AccountsFixtures do
     {:ok, user_account} =
       attrs
       |> Enum.into(%{
-        cpf: "29047912802",
+        cpf: Brcpfcnpj.cpf_generate(),
         first_name: "some first_name",
         balance: "1250",
         last_name: "some last_name",

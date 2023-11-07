@@ -10,7 +10,7 @@ defmodule ChallengeBackend.Repo.Migrations.CreateUserAccounts do
       add :password_hash, :string
       add :balance, :decimal
 
-      timestamps(type: :utc_datetime)
+      timestamps(type: :utc_datetime_usec)
     end
 
     create unique_index(:user_accounts, [:cpf])

@@ -3,6 +3,8 @@ defmodule ChallengeBackend.Accounts.UserAccount do
   import Ecto.Changeset
   import Brcpfcnpj.Changeset
 
+  alias ChallengeBackend.Transactions.Transaction
+
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
   schema "user_accounts" do
@@ -13,7 +15,10 @@ defmodule ChallengeBackend.Accounts.UserAccount do
     field :password_hash, :string
     field :balance, :decimal
 
-    timestamps(type: :utc_datetime)
+    has_many :paid_transactions, Transaction, foreign_key: :payer_id
+    has_many :received_transactions, Transaction, foreign_key: :receiver_id
+
+    timestamps(type: :utc_datetime_usec)
   end
 
   @fields ~w(first_name last_name cpf password balance)a
@@ -28,6 +33,10 @@ defmodule ChallengeBackend.Accounts.UserAccount do
     |> validate_cpf(:cpf)
     |> validate_number(:balance, greater_than: 0)
     |> put_password_hash()
+  end
+
+  def update_balance_changeset(user_account, new_balance) do
+    cast(user_account, %{balance: new_balance}, [:balance])
   end
 
   defp put_password_hash(

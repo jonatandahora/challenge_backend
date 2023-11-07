@@ -15,9 +15,9 @@ defmodule ChallengeBackend.AccountsTest do
       assert Accounts.list_user_accounts() == [user_account]
     end
 
-    test "get_user_account!/1 returns the user_account with given id" do
+    test "get_user_account/1 returns the user_account with given id" do
       user_account = user_account_fixture()
-      assert Accounts.get_user_account!(user_account.id) == user_account
+      assert Accounts.get_user_account(user_account.id) == {:ok, user_account}
     end
 
     test "create_user_account/1 with valid data creates a user_account" do
@@ -92,13 +92,13 @@ defmodule ChallengeBackend.AccountsTest do
       assert {:error, %Ecto.Changeset{}} =
                Accounts.update_user_account(user_account, @invalid_attrs)
 
-      assert user_account == Accounts.get_user_account!(user_account.id)
+      assert {:ok, user_account} == Accounts.get_user_account(user_account.id)
     end
 
     test "delete_user_account/1 deletes the user_account" do
       user_account = user_account_fixture()
       assert {:ok, %UserAccount{}} = Accounts.delete_user_account(user_account)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_user_account!(user_account.id) end
+      assert {:error, :not_found} = Accounts.get_user_account(user_account.id)
     end
 
     test "change_user_account/1 returns a user_account changeset" do

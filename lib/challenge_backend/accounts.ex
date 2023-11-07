@@ -24,18 +24,22 @@ defmodule ChallengeBackend.Accounts do
   @doc """
   Gets a single user_account.
 
-  Raises `Ecto.NoResultsError` if the User account does not exist.
 
   ## Examples
 
-      iex> get_user_account!(123)
-      %UserAccount{}
+      iex> get_user_account(123)
+      {:ok, %UserAccount{}}
 
       iex> get_user_account!(456)
-      ** (Ecto.NoResultsError)
+      {:error, :not_found}
 
   """
-  def get_user_account!(id), do: Repo.get!(UserAccount, id)
+  def get_user_account(id) do
+    case Repo.get(UserAccount, id) do
+      nil -> {:error, :not_found}
+      user_account -> {:ok, user_account}
+    end
+  end
 
   @doc """
   Creates a user_account.
@@ -100,5 +104,19 @@ defmodule ChallengeBackend.Accounts do
   """
   def change_user_account(%UserAccount{} = user_account, attrs \\ %{}) do
     UserAccount.changeset(user_account, attrs)
+  end
+
+  def add_balance(%UserAccount{} = user_account, %Decimal{} = amount) do
+    new_amount = Decimal.add(user_account.balance, amount)
+    user_account
+    |> UserAccount.update_balance_changeset(new_amount)
+    |> Repo.update()
+  end
+
+  def subtract_balance(%UserAccount{} = user_account, %Decimal{} = amount) do
+    new_amount = Decimal.sub(user_account.balance, amount)
+    user_account
+    |> UserAccount.update_balance_changeset(new_amount)
+    |> Repo.update()
   end
 end
