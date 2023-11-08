@@ -253,7 +253,8 @@ defmodule ChallengeBackend.TransactionsTest do
       assert Decimal.equal?(reversed_transaction.payer.balance, Decimal.new(1000))
       assert Decimal.equal?(reversed_transaction.receiver.balance, Decimal.new(1000))
 
-      assert {:error, {:reversable, :already_reversed}} == Transactions.reverse_transaction(transaction.id)
+      assert {:error, {:reversable, :already_reversed}} ==
+               Transactions.reverse_transaction(transaction.id)
     end
   end
 end
