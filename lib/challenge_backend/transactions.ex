@@ -45,18 +45,23 @@ defmodule ChallengeBackend.Transactions do
   @doc """
   Gets a single transaction.
 
-  Raises `Ecto.NoResultsError` if the Transaction does not exist.
-
   ## Examples
 
-      iex> get_transaction!(123)
-      %Transaction{}
+      iex> get_transaction(23)
+      {:ok, %Transaction{}}
 
-      iex> get_transaction!(456)
-      ** (Ecto.NoResultsError)
+      iex> get_transaction(456)
+      {:error, :not_found}
 
   """
-  def get_transaction!(id), do: Repo.get!(Transaction, id)
+  def get_transaction(id, preloads \\ []) do
+    query = from(t in Transaction, where: t.id == ^id, preload: ^preloads)
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      transaction -> {:ok, transaction}
+    end
+  end
 
   @doc """
   Creates a transaction.
@@ -76,84 +81,102 @@ defmodule ChallengeBackend.Transactions do
     |> Repo.insert()
   end
 
-  @doc """
-  Updates a transaction.
-
-  ## Examples
-
-      iex> update_transaction(transaction, %{field: new_value})
-      {:ok, %Transaction{}}
-
-      iex> update_transaction(transaction, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_transaction(%Transaction{} = transaction, attrs) do
-    transaction
-    |> Transaction.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a transaction.
-
-  ## Examples
-
-      iex> delete_transaction(transaction)
-      {:ok, %Transaction{}}
-
-      iex> delete_transaction(transaction)
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def delete_transaction(%Transaction{} = transaction) do
-    Repo.delete(transaction)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking transaction changes.
-
-  ## Examples
-
-      iex> change_transaction(transaction)
-      %Ecto.Changeset{data: %Transaction{}}
-
-  """
-  def change_transaction(%Transaction{} = transaction, attrs \\ %{}) do
-    Transaction.changeset(transaction, attrs)
-  end
-
   @spec do_transaction(%{
           :amount => any(),
           :payer_id => any(),
           :receiver_id => any(),
           optional(any()) => any()
-        }) :: any()
+        }) :: {:error, {any(), any()}} | {:ok, any()}
   @doc """
   Validates and processes a transaction
   """
-
   def do_transaction(%{payer_id: payer_id, receiver_id: receiver_id, amount: amount} = attrs) do
     Multi.new()
-    |> Multi.run(:payer, fn _, _ -> Accounts.get_user_account(payer_id) end)
-    |> Multi.run(:receiver, fn _, _ -> Accounts.get_user_account(receiver_id) end)
+    |> Multi.run(:payer, fn _, _ -> Accounts.fetch_lock_user_account(payer_id) end)
+    |> Multi.run(:receiver, fn _, _ -> Accounts.fetch_lock_user_account(receiver_id) end)
     |> Multi.run(:validate, fn _, %{payer: payer} -> validate_balance(payer, amount) end)
     |> Multi.run(:transaction, fn _, _ -> create_transaction(attrs) end)
-    |> Multi.run(:update_payer_balance, fn _, %{payer: payer, transaction: transaction} ->
+    |> Multi.run(:updated_payer, fn _, %{payer: payer, transaction: transaction} ->
       Accounts.subtract_balance(payer, transaction.amount)
     end)
-    |> Multi.run(:update_receiver_balance, fn _,
-                                              %{receiver: receiver, transaction: transaction} ->
+    |> Multi.run(:updated_receiver, fn _, %{receiver: receiver, transaction: transaction} ->
       Accounts.add_balance(receiver, transaction.amount)
     end)
     |> Repo.transaction()
+    |> normalize_transaction_result()
   end
 
-  defp validate_balance(payer, amount) do
-    if Decimal.compare(payer.balance, amount) == :lt do
+  @doc """
+  Reverses a transaction
+  """
+  def reverse_transaction(transaction_id) do
+    Multi.new()
+    |> Multi.run(:transaction, fn _, _ -> get_transaction(transaction_id) end)
+    |> Multi.run(:reversable, fn _, %{transaction: transaction} ->
+      check_if_reversable(transaction)
+    end)
+    |> Multi.run(:payer, fn _, %{transaction: transaction} ->
+      Accounts.fetch_lock_user_account(transaction.payer_id)
+    end)
+    |> Multi.run(:receiver, fn _, %{transaction: transaction} ->
+      Accounts.fetch_lock_user_account(transaction.receiver_id)
+    end)
+    |> Multi.run(:validate, fn _, %{transaction: transaction, receiver: receiver} ->
+      validate_balance(receiver, transaction.amount)
+    end)
+    |> Multi.update(
+      :reversed_transaction,
+      fn %{transaction: transaction} ->
+        Transaction.changeset(transaction, %{reversed_at: DateTime.utc_now()})
+      end
+    )
+    |> Multi.run(:updated_payer, fn _, %{payer: payer, transaction: transaction} ->
+      Accounts.add_balance(payer, transaction.amount)
+    end)
+    |> Multi.run(:updated_receiver, fn _, %{receiver: receiver, transaction: transaction} ->
+      Accounts.subtract_balance(receiver, transaction.amount)
+    end)
+    |> Repo.transaction()
+    |> normalize_transaction_result()
+  end
+
+  defp validate_balance(user_account, amount) do
+    if Decimal.compare(user_account.balance, amount) == :lt do
       {:error, :not_enough_balance}
     else
       {:ok, nil}
     end
+  end
+
+  defp check_if_reversable(transaction) do
+    if is_nil(transaction.reversed_at) do
+      {:ok, nil}
+    else
+      {:error, :already_reversed}
+    end
+  end
+
+  defp normalize_transaction_result(transaction) do
+    case transaction do
+      {:ok, %{reversed_transaction: transaction}} ->
+        {:ok, transaction}
+
+      {:ok, %{transaction: transaction}} ->
+        {:ok, transaction}
+
+      {:error, step, %Ecto.Changeset{} = changeset, _changes} ->
+        {:error, {step, errors_on(changeset)}}
+
+      {:error, step, message, _changes} ->
+        {:error, {step, message}}
+    end
+  end
+
+  defp errors_on(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
   end
 end

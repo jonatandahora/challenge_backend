@@ -1,12 +1,11 @@
 defmodule ChallengeBackend.TransactionsTest do
   use ChallengeBackend.DataCase
 
-  alias ChallengeBackend.Transactions
+  alias ChallengeBackend.Accounts
+  alias ChallengeBackend.{AccountsFixtures, Transactions}
+  alias ChallengeBackend.Transactions.Transaction
 
   describe "transaction" do
-    alias ChallengeBackend.AccountsFixtures
-    alias ChallengeBackend.Transactions.Transaction
-
     import ChallengeBackend.TransactionsFixtures
 
     @invalid_attrs %{amount: nil, idempotency_key: nil, processed_at: nil, reversed_at: nil}
@@ -21,15 +20,16 @@ defmodule ChallengeBackend.TransactionsTest do
       transaction2 = transaction_fixture(%{processed_at: ~U[2023-11-01 01:29:00.000000Z]})
       _transaction3 = transaction_fixture(%{processed_at: ~U[2023-11-06 01:29:00.000000Z]})
 
-      assert Transactions.list_by_date(~U[2023-10-06 00:00:00.000000Z], ~U[2023-11-05 23:59:59Z]) == [
-               transaction2,
-               transaction1
-             ]
+      assert Transactions.list_by_date(~U[2023-10-06 00:00:00.000000Z], ~U[2023-11-05 23:59:59Z]) ==
+               [
+                 transaction2,
+                 transaction1
+               ]
     end
 
-    test "get_transaction!/1 returns the transaction with given id" do
+    test "get_transaction/1 returns the transaction with given id" do
       transaction = transaction_fixture()
-      assert Transactions.get_transaction!(transaction.id) == transaction
+      assert Transactions.get_transaction(transaction.id) == {:ok, transaction}
     end
 
     test "create_transaction/1 with valid data creates a transaction" do
@@ -55,56 +55,205 @@ defmodule ChallengeBackend.TransactionsTest do
     test "create_transaction/1 with invalid data returns error changeset" do
       assert {:error, %Ecto.Changeset{}} = Transactions.create_transaction(@invalid_attrs)
     end
+  end
 
-    test "update_transaction/2 with valid data updates the transaction" do
-      transaction = transaction_fixture()
-
-      update_attrs = %{
-        amount: "4567",
-        idempotency_key: "some updated idempotency_key",
-        processed_at: ~U[2023-11-07 01:29:00.000000Z],
-        reversed_at: ~U[2023-11-07 01:29:00.000000Z]
-      }
-
-      assert {:ok, %Transaction{} = transaction} =
-               Transactions.update_transaction(transaction, update_attrs)
-
-      assert transaction.amount == Decimal.new("4567")
-      assert transaction.idempotency_key == "some updated idempotency_key"
-      assert transaction.processed_at == ~U[2023-11-07 01:29:00.000000Z]
-      assert transaction.reversed_at == ~U[2023-11-07 01:29:00.000000Z]
-    end
-
-    test "update_transaction/2 with invalid data returns error changeset" do
-      transaction = transaction_fixture()
-
-      assert {:error, %Ecto.Changeset{}} =
-               Transactions.update_transaction(transaction, @invalid_attrs)
-
-      assert transaction == Transactions.get_transaction!(transaction.id)
-    end
-
-    test "delete_transaction/1 deletes the transaction" do
-      transaction = transaction_fixture()
-      assert {:ok, %Transaction{}} = Transactions.delete_transaction(transaction)
-      assert_raise Ecto.NoResultsError, fn -> Transactions.get_transaction!(transaction.id) end
-    end
-
-    test "change_transaction/1 returns a transaction changeset" do
-      transaction = transaction_fixture()
-      assert %Ecto.Changeset{} = Transactions.change_transaction(transaction)
-    end
-
+  describe "do_transaction/1" do
     test "do_transaction/1 processes a transaction succesfully" do
-      payer = AccountsFixtures.user_account_fixture()
-      receiver = AccountsFixtures.user_account_fixture()
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
       attrs = %{
         payer_id: payer.id,
         receiver_id: receiver.id,
         idempotency_key: Ecto.UUID.generate(),
         amount: Decimal.new(1000)
       }
-      {:ok, result} = Transactions.do_transaction(attrs)
+
+      {:ok, transaction} = Transactions.do_transaction(attrs)
+      {:ok, transaction} = Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(transaction.payer.balance, Decimal.new(0))
+      assert Decimal.equal?(transaction.receiver.balance, Decimal.new(2000))
+    end
+
+    test "do_transaction/1 can't process a transaction when payer has not enough balance" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1500)
+      }
+
+      assert {:error, {:validate, :not_enough_balance}} = Transactions.do_transaction(attrs)
+    end
+
+    test "do_transaction/1 can't process a transaction when payer and receiver are the same" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: payer.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1000)
+      }
+
+      assert {:error, {:transaction, %{payer_id: ["payer can't be the same as receiver"]}}} =
+               Transactions.do_transaction(attrs)
+    end
+
+    test "do_transaction/1 can't process a transaction when receiver account doesn't exist" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: Ecto.UUID.generate(),
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1500)
+      }
+
+      assert {:error, {:receiver, :not_found}} = Transactions.do_transaction(attrs)
+    end
+
+    test "do_transaction/1 can't process a transaction when payer account doesn't exist" do
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: Ecto.UUID.generate(),
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1500)
+      }
+
+      assert {:error, {:payer, :not_found}} = Transactions.do_transaction(attrs)
+    end
+
+    test "do_transaction/1 can't process a transaction when amount is invalid" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(-1000)
+      }
+
+      assert {:error, {:transaction, %{amount: ["must be greater than 0"]}}} =
+               Transactions.do_transaction(attrs)
+    end
+
+    test "do_transaction/1 can't process a duplicated transaction" do
+      idempotency_key = Ecto.UUID.generate()
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(2000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: idempotency_key,
+        amount: Decimal.new(1000)
+      }
+
+      {:ok, transaction} = Transactions.do_transaction(attrs)
+      {:ok, transaction} = Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(transaction.payer.balance, Decimal.new(1000))
+      assert Decimal.equal?(transaction.receiver.balance, Decimal.new(2000))
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: idempotency_key,
+        amount: Decimal.new(1000)
+      }
+
+      assert {:error, {:transaction, %{idempotency_key: ["has already been taken"]}}} =
+               Transactions.do_transaction(attrs)
+    end
+  end
+
+  describe "reverse_transaction/1" do
+    test "reverse_transaction/1 reverses an existing transaction succesfully" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1000)
+      }
+
+      {:ok, transaction} = Transactions.do_transaction(attrs)
+
+      {:ok, transaction} = Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(transaction.payer.balance, Decimal.new(0))
+      assert Decimal.equal?(transaction.receiver.balance, Decimal.new(2000))
+
+      Transactions.reverse_transaction(transaction.id)
+
+      {:ok, reversed_transaction} =
+        Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(reversed_transaction.payer.balance, Decimal.new(1000))
+      assert Decimal.equal?(reversed_transaction.receiver.balance, Decimal.new(1000))
+    end
+
+    test "reverse_transaction/1 can't reverse an existing transaction succesfully when receiver balance is not enough" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1000)
+      }
+
+      {:ok, transaction} = Transactions.do_transaction(attrs)
+
+      {:ok, transaction} = Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(transaction.payer.balance, Decimal.new(0))
+      assert Decimal.equal?(transaction.receiver.balance, Decimal.new(2000))
+
+      Accounts.subtract_balance(transaction.receiver, Decimal.new(1500))
+
+      assert {:error, {:validate, :not_enough_balance}} ==
+               Transactions.reverse_transaction(transaction.id)
+    end
+
+    test "reverse_transaction/1 can't reverse an already reversed transaction" do
+      payer = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+      receiver = AccountsFixtures.user_account_fixture(%{balance: Decimal.new(1000)})
+
+      attrs = %{
+        payer_id: payer.id,
+        receiver_id: receiver.id,
+        idempotency_key: Ecto.UUID.generate(),
+        amount: Decimal.new(1000)
+      }
+
+      {:ok, transaction} = Transactions.do_transaction(attrs)
+
+      {:ok, transaction} = Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(transaction.payer.balance, Decimal.new(0))
+      assert Decimal.equal?(transaction.receiver.balance, Decimal.new(2000))
+
+      Transactions.reverse_transaction(transaction.id)
+
+      {:ok, reversed_transaction} =
+        Transactions.get_transaction(transaction.id, [:payer, :receiver])
+
+      assert Decimal.equal?(reversed_transaction.payer.balance, Decimal.new(1000))
+      assert Decimal.equal?(reversed_transaction.receiver.balance, Decimal.new(1000))
+
+      assert {:error, {:reversable, :already_reversed}} == Transactions.reverse_transaction(transaction.id)
     end
   end
 end

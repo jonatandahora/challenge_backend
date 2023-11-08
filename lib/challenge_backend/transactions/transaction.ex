@@ -26,7 +26,7 @@ defmodule ChallengeBackend.Transactions.Transaction do
     transaction
     |> cast(attrs, @fields)
     |> prepare_changes(fn changeset ->
-      if !get_change(changeset, :processed_at) do
+      if is_nil(get_change(changeset, :processed_at)) do
         put_change(changeset, :processed_at, DateTime.utc_now())
       else
         changeset
@@ -36,6 +36,8 @@ defmodule ChallengeBackend.Transactions.Transaction do
     |> validate_number(:amount, greater_than: 0)
     |> validate_ids()
     |> unique_constraint(:idempotency_key)
+    |> foreign_key_constraint(:payer_id)
+    |> foreign_key_constraint(:receiver_id)
   end
 
   defp validate_ids(%{changes: %{payer_id: payer_id, receiver_id: receiver_id}} = changeset)
