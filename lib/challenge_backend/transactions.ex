@@ -81,12 +81,6 @@ defmodule ChallengeBackend.Transactions do
     |> Repo.insert()
   end
 
-  @spec do_transaction(%{
-          :amount => any(),
-          :payer_id => any(),
-          :receiver_id => any(),
-          optional(any()) => any()
-        }) :: {:error, {any(), any()}} | {:ok, any()}
   @doc """
   Validates and processes a transaction
   """
