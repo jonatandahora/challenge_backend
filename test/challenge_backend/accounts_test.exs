@@ -64,5 +64,17 @@ defmodule ChallengeBackend.AccountsTest do
       assert {:error, %Ecto.Changeset{} = changeset} = Accounts.create_user_account(invalid_attrs)
       assert errors_on(changeset)[:cpf]
     end
+
+    test "login_user_account/2 authorizes a valid set of credentials" do
+      user_account = user_account_fixture(%{cpf: "53432419058", password: "valid password"})
+      assert Accounts.login_user_account("53432419058", "valid password") == {:ok, user_account}
+    end
+
+    test "login_user_account/2 can't authorize an invalid set of credentials" do
+      user_account_fixture(%{cpf: "53432419058", password: "valid password"})
+
+      assert Accounts.login_user_account("53432419058", "invalid password") ==
+               {:error, :unauthorized}
+    end
   end
 end
