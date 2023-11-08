@@ -7,5 +7,8 @@ defmodule ChallengeBackendWeb.Router do
 
   scope "/api", ChallengeBackendWeb do
     pipe_through :api
+    post("/login", AccountsController, :login)
+    post("/sign_up", AccountsController, :sign_up)
+    get("/balance/", AccountsController, :balance)
   end
 end
