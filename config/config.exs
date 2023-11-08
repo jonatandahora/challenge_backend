@@ -30,6 +30,14 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :challenge_backend, ChallengeBackendWeb.Auth.Guardian,
+  issuer: "challenge_backend",
+  secret_key: "xT5gdlDmJrUKPQLWvhgtcALPnx3mYeAj6q1UyJ/mshiRhkYuFrw58VvbxNxTx4w1"
+
+config :challenge_backend, ChallengeBackendWeb.Auth.Pipeline,
+  module: ChallengeBackendWeb.Auth.Guardian,
+  error_handler: ChallengeBackendWeb.Auth.ErrorHandler
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

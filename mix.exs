@@ -43,7 +43,8 @@ defmodule ChallengeBackend.MixProject do
       {:plug_cowboy, "~> 2.5"},
       {:argon2_elixir, "~> 4.0"},
       {:brcpfcnpj, "~> 1.0"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:guardian, "~> 2.0"}
     ]
   end
 
