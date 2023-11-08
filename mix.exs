@@ -42,7 +42,8 @@ defmodule ChallengeBackend.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:plug_cowboy, "~> 2.5"},
       {:argon2_elixir, "~> 4.0"},
-      {:brcpfcnpj, "~> 1.0"}
+      {:brcpfcnpj, "~> 1.0"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 
