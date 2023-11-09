@@ -25,3 +25,6 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 challenge_backend-*.tar
 
+#ignore elixir_ls files
+/.elixir_ls
+
