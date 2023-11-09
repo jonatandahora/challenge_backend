@@ -22,20 +22,21 @@ defmodule ChallengeBackend.Transactions do
   end
 
   @doc """
-  Returns the list of transactions by a range of dates.
+  Returns the list of transactions by payer_id and a range of dates.
 
   ## Examples
 
-      iex> list_by_date(~U[2023-10-06 01:29:00Z], ~U[2023-11-06 01:29:00Z])
+      iex> list_by_payer_and_date("fc79631e-a72f-4a42-8520-aea0048ff050", ~U[2023-10-06 01:29:00Z], ~U[2023-11-06 01:29:00Z])
       [%Transaction{}, ...]
 
   """
-  def list_by_date(from, to, preloads \\ []) do
+  def list_by_payer_and_date(payer_id, from, to, preloads \\ []) do
     query =
       from(transaction in Transaction,
+        where: transaction.payer_id == ^payer_id,
         where: transaction.processed_at >= ^from,
         where: transaction.processed_at <= ^to,
-        order_by: [desc: transaction.processed_at],
+        order_by: [asc: transaction.processed_at],
         preload: ^preloads
       )
 

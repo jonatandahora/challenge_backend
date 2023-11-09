@@ -15,16 +15,23 @@ defmodule ChallengeBackend.TransactionsTest do
       assert Transactions.list_transaction() == [transaction]
     end
 
-    test "list_by_date/2 returns all transactions within the date range given" do
-      transaction1 = transaction_fixture(%{processed_at: ~U[2023-10-06 01:29:00.000000Z]})
-      transaction2 = transaction_fixture(%{processed_at: ~U[2023-11-01 01:29:00.000000Z]})
-      _transaction3 = transaction_fixture(%{processed_at: ~U[2023-11-06 01:29:00.000000Z]})
+    test "list_by_payer_and_date/2 returns all transactions within the date range given" do
+      payer = AccountsFixtures.user_account_fixture()
 
-      assert Transactions.list_by_date(~U[2023-10-06 00:00:00.000000Z], ~U[2023-11-05 23:59:59Z]) ==
-               [
-                 transaction2,
-                 transaction1
-               ]
+      transaction1 =
+        transaction_fixture(%{payer_id: payer.id, processed_at: ~U[2023-10-06 01:29:00.000000Z]})
+
+      transaction2 =
+        transaction_fixture(%{payer_id: payer.id, processed_at: ~U[2023-11-01 01:29:00.000000Z]})
+
+      _transaction3 =
+        transaction_fixture(%{payer_id: payer.id, processed_at: ~U[2023-11-06 01:29:00.000000Z]})
+
+      assert Transactions.list_by_payer_and_date(
+               payer.id,
+               ~U[2023-10-06 00:00:00.000000Z],
+               ~U[2023-11-05 23:59:59.000000Z]
+             ) == [transaction1, transaction2]
     end
 
     test "get_transaction/1 returns the transaction with given id" do
