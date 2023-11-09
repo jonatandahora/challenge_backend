@@ -1,18 +1,116 @@
-# ChallengeBackend
+[![tests](https://github.com/jonatandahora/challenge_backend/actions/workflows/elixir.yaml/badge.svg)](https://github.com/jonatandahora/challenge_backend/actions/workflows/elixir.yaml)
 
-To start your Phoenix server:
+# Desafio Cumbuca Backend
 
-  * Run `mix setup` to install and setup dependencies
-  * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+Esse app foi desenvolvido para o _desafio backend da Cumbuca_
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+O mesmo se encontra deployado em [https://challenge-backend.fly.dev/](https://challenge-backend.fly.dev/)
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+Também disponibilizo uma collection do insomnia para testes já com os ambientes e headers configurados [aqui](challenge-insomnia.json)
 
-## Learn more
+## Endpoints
 
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
+#### Criar conta de usúario
+
+<details>
+ <summary><code>POST</code> <code><b>/</b></code> <code>accounts</code></summary>
+
+
+##### Parâmetros
+
+> | nome         | tipo        | tipo de dado | descrição                |
+> | ------------ | ----------- | ------------ | ------------------------ |
+> | `first_name` | obrigatório | string       | Primeiro nome do usuário |
+> | `last_name` | obrigatório | string       | sobrenome do usuário |
+> | `cpf` | obrigatório | string       | CPF sem formatação |
+> | `pasword` | obrigatório | string       | senha de acesso |
+> | `balance` | obrigatório | string       | saldo inicial do usuário |
+</details>
+
+---
+
+
+#### Login
+
+<details>
+ <summary><code>POST</code> <code><b>/</b></code> <code>accounts</code> <code><b>/</b></code> <code>login</code> </summary>
+
+##### Parâmetros
+
+> | nome         | tipo        | tipo de dado | descrição                |
+> | ------------ | ----------- | ------------ | ------------------------ |
+> | `cpf` | obrigatório | string       | CPF sem formatação |
+> | `pasword` | obrigatório | string       | senha de acesso |
+
+Após um login bem sucedido, todas as operaçoes subsequentes precisar incluir o Header `Authorization` com o token e o prefixo `Bearer`
+</details>
+
+---
+
+#### Consultar Saldo
+
+<details>
+ <summary><code>GET</code> <code><b>/</b></code> <code>accounts</code> <code><b>/</b></code> <code>balance</code> </summary>
+
+>
+
+
+Retorna o saldo atual da conta logada atraves do Header `Authorization`
+</details>
+
+---
+
+#### Criar Transação
+
+<details>
+ <summary><code>POST</code> <code><b>/</b></code> <code>transactions</code> </summary>
+
+>
+##### Parâmetros
+
+> | nome         | tipo        | tipo de dado | descrição                |
+> | ------------ | ----------- | ------------ | ------------------------ |
+> | `receiver_id` | obrigatório | UUID       | Identificador da conta recebedora |
+> | `amount` | obrigatório | integer       | Valor da transação em centavos |
+> | `idempotency_key` | obrigatório | string       | Identificador único da transação |
+
+A conta pagadora sempre será a do usuário logado, o mesmo não podendo fazer uma transação para sí próprio
+</details>
+
+---
+
+
+#### Estornar Transação
+
+<details>
+ <summary><code>PATCH</code> <code><b>/</b></code> <code>transactions</code> <code><b>/</b></code> <code>:identifier</code> <code><b>/</b></code> <code>reverse</code> </summary>
+
+>
+##### Parâmetros
+
+> | nome         | tipo        | tipo de dado | descrição                |
+> | ------------ | ----------- | ------------ | ------------------------ |
+> | `transaction_id` | obrigatório | UUID(URL param)      | Identificador da transação |
+
+A transação só poderá ser estornada caso a conta recebedora original tenha saldo suficiente.
+</details>
+
+---
+
+#### Listar Transações Por Data
+
+<details>
+ <summary><code>GET</code> <code><b>/</b></code> <code>transactions</code> <code><b>?</b></code> <code>from=</code> <code><b>&</b></code> <code>to=</code> </summary>
+
+>
+##### Parâmetros
+
+> | nome         | tipo        | tipo de dado | descrição                |
+> | ------------ | ----------- | ------------ | ------------------------ |
+> | `from` | obrigatório | Data ISO 8601(Query String)      | Data inicial |
+> | `to` | obrigatório | Data ISO 8601(Query String)      | Data final |
+
+Somente serão listadas as transações da conta logada com um range de datas válido
+</details>
+
+---
