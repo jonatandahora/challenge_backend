@@ -3,7 +3,7 @@ defmodule ChallengeBackendWeb.AccountsController do
 
   alias ChallengeBackend.Accounts
   alias ChallengeBackendWeb.Auth.{Guardian, Pipeline}
-  alias ChallengeBackendWeb.FallbackController
+  alias ChallengeBackendWeb.{FallbackController, LoginParams}
 
   action_fallback(FallbackController)
   plug(Pipeline when action not in [:login, :sign_up])
@@ -17,21 +17,15 @@ defmodule ChallengeBackendWeb.AccountsController do
     end
   end
 
-  def login(conn, %{"cpf" => cpf, "password" => password}) do
-    case Accounts.login_user_account(cpf, password) do
-      {:error, _} ->
-        conn
-        |> put_status(:unauthorized)
-        |> put_view(json: ChallengeBackendWeb.ErrorJSON)
-        |> render(:"401")
+  def login(conn, params) do
+    with {:ok, _params} <- LoginParams.validate_params(params),
+         {:ok, user_account} <- Accounts.login_user_account(params["cpf"], params["password"]) do
+      {:ok, token, _claims} = Guardian.encode_and_sign(user_account)
 
-      {:ok, user_account} ->
-        {:ok, token, _claims} = Guardian.encode_and_sign(user_account)
-
-        conn
-        |> put_status(200)
-        |> put_view(json: ChallengeBackendWeb.AccountsJson)
-        |> render(:login, %{token: token})
+      conn
+      |> put_status(200)
+      |> put_view(json: ChallengeBackendWeb.AccountsJson)
+      |> render(:login, %{token: token})
     end
   end
 

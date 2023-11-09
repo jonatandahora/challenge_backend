@@ -56,7 +56,8 @@ defmodule ChallengeBackendWeb.AccountsControllerTest do
     test "failed with invalid cpf", %{conn: conn} do
       user_account_fixture(%{password: "123456"})
 
-      conn = post(conn, ~p"/api/accounts/login", %{cpf: Brcpfcnpj.cpf_generate(), password: "123456"})
+      conn =
+        post(conn, ~p"/api/accounts/login", %{cpf: Brcpfcnpj.cpf_generate(), password: "123456"})
 
       assert %{"errors" => %{"detail" => "Not Found"}} == json_response(conn, 404)
     end

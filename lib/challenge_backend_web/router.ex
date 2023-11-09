@@ -7,8 +7,11 @@ defmodule ChallengeBackendWeb.Router do
 
   scope "/api", ChallengeBackendWeb do
     pipe_through :api
-    post("/login", AccountsController, :login)
-    post("/sign_up", AccountsController, :sign_up)
-    get("/balance/", AccountsController, :balance)
+    post("/accounts/login", AccountsController, :login)
+    post("/accounts/", AccountsController, :sign_up)
+    get("/accounts/balance/", AccountsController, :balance)
+    get("/transactions/", TransactionsController, :list_transactions)
+    post("/transactions/", TransactionsController, :do_transaction)
+    patch("/transactions/:id/reverse", TransactionsController, :reverse_transaction)
   end
 end

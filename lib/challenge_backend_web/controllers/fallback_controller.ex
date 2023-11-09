@@ -6,7 +6,6 @@ defmodule ChallengeBackendWeb.FallbackController do
   """
   use ChallengeBackendWeb, :controller
 
-  # This clause handles errors returned by Ecto's insert/update/delete.
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
     conn
     |> put_status(:unprocessable_entity)
@@ -14,11 +13,24 @@ defmodule ChallengeBackendWeb.FallbackController do
     |> render(:error, changeset: changeset)
   end
 
-  # This clause is an example of how to handle resources that cannot be found.
+  def call(conn, {:error, {step, message}}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> put_view(json: ChallengeBackendWeb.ErrorJSON)
+    |> render("error.json", %{step: step, message: message})
+  end
+
   def call(conn, {:error, :not_found}) do
     conn
     |> put_status(:not_found)
     |> put_view(json: ChallengeBackendWeb.ErrorJSON)
     |> render(:"404")
+  end
+
+  def call(conn, {:error, :unauthorized}) do
+    conn
+    |> put_status(:unauthorized)
+    |> put_view(json: ChallengeBackendWeb.ErrorJSON)
+    |> render(:"401")
   end
 end

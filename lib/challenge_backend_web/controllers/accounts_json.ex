@@ -1,4 +1,9 @@
 defmodule ChallengeBackendWeb.AccountsJson do
+  @moduledoc """
+  View for AccountsController
+
+  """
+
   @doc """
   Renders the login token.
   """
@@ -6,6 +11,9 @@ defmodule ChallengeBackendWeb.AccountsJson do
     %{data: %{token: token}}
   end
 
+  @doc """
+  Renders an user_account
+  """
   def user_account(%{user_account: user_account}) do
     %{
       data: %{
@@ -13,11 +21,15 @@ defmodule ChallengeBackendWeb.AccountsJson do
         balance: user_account.balance,
         cpf: user_account.cpf,
         first_name: user_account.first_name,
-        last_name: user_account.last_name
+        last_name: user_account.last_name,
+        created_at: user_account.inserted_at
       }
     }
   end
 
+  @doc """
+  Renders an user_account's balance.
+  """
   def balance(%{user_account: user_account}) do
     %{
       data: %{

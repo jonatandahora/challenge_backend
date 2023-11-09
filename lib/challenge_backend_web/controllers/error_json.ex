@@ -1,4 +1,15 @@
 defmodule ChallengeBackendWeb.ErrorJSON do
+  @moduledoc """
+  Renders common errors
+  """
+
+  @doc """
+  Renders a normalized error message from a Ecto.Multi
+  """
+  def render("error.json", %{step: step, message: message}) do
+    %{errors: %{detail: %{step => message}}}
+  end
+
   # If you want to customize a particular status code,
   # you may add your own clauses, such as:
   #
